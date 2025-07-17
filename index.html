@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>令和6年度未踏AKATUSKI事業者マップ</title>
+    <script src='https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css' rel='stylesheet' />
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+        }
+        
+        #container {
+            display: flex;
+            height: 100vh;
+            gap: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        #map-container {
+            flex: 1;
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        #sidebar {
+            width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        #data-panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        #clear-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1;
+        }
+        
+        h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .data-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+        
+        .data-item:hover {
+            background: #e9ecef;
+            transform: translateX(4px);
+        }
+        
+        .data-item.active {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+        }
+        
+        .data-item-id {
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .data-item-program {
+            color: #333;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .data-item-areas {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .area-info {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        .area-label {
+            width: 80px;
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .area-value {
+            flex: 1;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        
+        .area-value.prefecture {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .area-value.city {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .area-value.empty {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        .attribution {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #666;
+            z-index: 1;
+            max-width: 300px;
+            line-height: 1.4;
+        }
+        
+        .attribution a {
+            color: #1976d2;
+            text-decoration: none;
+        }
+        
+        .attribution a:hover {
+            text-decoration: underline;
+        }
+        
+        .attribution-button {
+            position: absolute;
+            bottom: 35px;
+            right: 10px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            z-index: 1;
+            transition: all 0.2s;
+        }
+        
+        .attribution-button:hover {
+            background: white;
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .attribution-button:hover {
+            background: white;
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .attribution-modal {
+            position: absolute;
+            bottom: 70px;
+            right: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            width: 300px;
+            z-index: 2;
+            display: none;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        
+        .attribution-modal.show {
+            display: block;
+        }
+        
+        .attribution-modal h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+        
+        .attribution-section {
+            margin-bottom: 12px;
+        }
+        
+        .attribution-section:first-child {
+            margin-top: 5px;
+        }
+        
+        .attribution-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .attribution-section strong {
+            display: block;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .attribution-modal a {
+            color: #0078A8;
+            text-decoration: none;
+        }
+        
+        .attribution-modal a:hover {
+            text-decoration: underline;
+        }
+        
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            color: #666;
+            font-size: 18px;
+            line-height: 1;
+        }
+        
+        .close-modal:hover {
+            color: #333;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 10;
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196f3;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn:hover {
+            background: white;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+        }
+        
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="sidebar">
+            <div id="data-panel">
+                <h2>プログラム一覧</h2>
+                <div id="data-list"></div>
+            </div>
+        </div>
+        
+        <div id="map-container">
+            <div id="map"></div>
+            <button id="clear-button" class="btn" onclick="clearSelection()">選択をクリア</button>
+            <div class="legend">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px;">凡例</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(65, 105, 225, 0.3); border: 2px solid #4169e1;"></div>
+                    <span>対象地域(都道府県)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(0, 200, 83, 0.8);"></div>
+                    <span>対象地域(市町村)</span>
+                </div>
+            </div>
+            <button class="attribution-button" onclick="toggleAttribution()" title="データソース情報">
+                データソース
+            </button>
+            <div id="attribution-modal" class="attribution-modal">
+                <span class="close-modal" onclick="toggleAttribution()">×</span>
+                <div class="attribution-section">
+                    <strong>自治体ポリゴン</strong>
+                    <div>国土交通省 国土数値情報（行政区域）</div>
+                    <div><a href="https://github.com/smartnews-smri/japan-topography/" target="_blank">smartnews-smri/japan-topography</a> より取得</div>
+                </div>
+                <div class="attribution-section">
+                    <strong>令和6年度 未踏AKATSUKI 事業 募集地域一覧</strong>
+                    <div>事業HP: <a href="https://mitouteki.jp/r6/" target="_blank">https://mitouteki.jp/r6/</a></div>
+                </div>
+            </div>
+            <div id="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">データを読み込み中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MapLibre GL JSの初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {},
+                layers: [{
+                    id: 'background',
+                    type: 'background',
+                    paint: {
+                        'background-color': '#e6f2ff'  // 海の色（薄い水色）
+                    }
+                }]
+            },
+            center: [137.0, 38.0], // 日本の中心付近
+            zoom: 5,
+            attributionControl: {
+                compact: false,
+                customAttribution: 'MapLibre'
+            }
+        });
+
+        let csvData = [];
+        let selectedItem = null;
+        let geoData = {
+            cities: null,
+            designatedCities: null,
+            prefectures: null // 都道府県境界データ
+        };
+
+        // 都道府県名からコードへのマッピング
+        const prefectureNameToCode = {
+            '北海道': '01', '青森県': '02', '岩手県': '03', '宮城県': '04', '秋田県': '05',
+            '山形県': '06', '福島県': '07', '茨城県': '08', '栃木県': '09', '群馬県': '10',
+            '埼玉県': '11', '千葉県': '12', '東京都': '13', '神奈川県': '14', '新潟県': '15',
+            '富山県': '16', '石川県': '17', '福井県': '18', '山梨県': '19', '長野県': '20',
+            '岐阜県': '21', '静岡県': '22', '愛知県': '23', '三重県': '24', '滋賀県': '25',
+            '京都府': '26', '大阪府': '27', '兵庫県': '28', '奈良県': '29', '和歌山県': '30',
+            '鳥取県': '31', '島根県': '32', '岡山県': '33', '広島県': '34', '山口県': '35',
+            '徳島県': '36', '香川県': '37', '愛媛県': '38', '高知県': '39', '福岡県': '40',
+            '佐賀県': '41', '長崎県': '42', '熊本県': '43', '大分県': '44', '宮崎県': '45',
+            '鹿児島県': '46', '沖縄県': '47'
+        };
+
+        // CSVファイルを読み込む関数
+        async function loadCSV(file) {
+            return new Promise((resolve, reject) => {
+                Papa.parse(file, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        // ヘッダーの空白を削除
+                        const cleanData = results.data.map(row => {
+                            const cleanRow = {};
+                            Object.keys(row).forEach(key => {
+                                const cleanKey = key.trim();
+                                cleanRow[cleanKey] = typeof row[key] === 'string' ? row[key].trim() : row[key];
+                            });
+                            return cleanRow;
+                        });
+                        resolve(cleanData.filter(row => row.ID)); // 空行を除外
+                    },
+                    error: function(error) {
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        // データリストを表示する関数
+        function displayDataList(data) {
+            const dataList = document.getElementById('data-list');
+            dataList.innerHTML = '';
+
+            data.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'data-item';
+                div.dataset.index = index;
+                
+                const targetArea = item['対象地域'] || '';
+                const link = item['リンク'] || '';
+
+                div.innerHTML = `
+                    <div class="data-item-id">ID: ${item.ID}</div>
+                    <div class="data-item-program">${item['プログラム(事業者)'] || ''}</div>
+                    <div class="data-item-areas">
+                        <div class="area-info">
+                            <span class="area-label">対象地域:</span>
+                            <span class="area-value" style="background: #e3f2fd; color: #1565c0;">
+                                ${targetArea || 'なし'}
+                            </span>
+                        </div>
+                        ${link ? `
+                        <div class="area-info" style="margin-top: 8px;">
+                            <a href="${link}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 13px; display: flex; align-items: center;">
+                                <span style="margin-right: 4px;">🔗</span>
+                                詳細を見る
+                            </a>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                div.addEventListener('click', () => selectItem(index));
+                dataList.appendChild(div);
+            });
+        }
+
+        // アイテムを選択する関数
+        function selectItem(index) {
+            // 前の選択をクリア
+            document.querySelectorAll('.data-item').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            // 新しい選択を設定
+            const selectedElement = document.querySelector(`[data-index="${index}"]`);
+            if (selectedElement) {
+                selectedElement.classList.add('active');
+            }
+
+            selectedItem = csvData[index];
+            highlightAreas(selectedItem);
+        }
+
+        // 地域をハイライトする関数
+        async function highlightAreas(item) {
+            // 既存のハイライトをクリア
+            ['prefecture-highlight-fill', 'prefecture-highlight-line', 
+             'city-highlight-fill', 'city-highlight-line',
+             'prefecture-outline', 'prefecture-outline-fill'].forEach(layerId => {
+                if (map.getLayer(layerId)) {
+                    map.removeLayer(layerId);
+                }
+            });
+            
+            ['prefecture-highlight', 'city-highlight', 'prefecture-outline'].forEach(sourceId => {
+                if (map.getSource(sourceId)) {
+                    map.removeSource(sourceId);
+                }
+            });
+
+            const prefectureFeatures = [];
+            const cityFeatures = [];
+            const bounds = new maplibregl.LngLatBounds();
+            const selectedPrefectures = [];
+
+            // 都道府県レベルの処理（複数対応）
+            if (item['都道府県レベル'] && geoData.cities) {
+                const prefectures = item['都道府県レベル'].split(/[,、]/).map(p => p.trim());
+                
+                prefectures.forEach(prefName => {
+                    const prefFeatures = geoData.cities.features.filter(f => 
+                        f.properties.N03_001 === prefName
+                    );
+                    
+                    if (prefFeatures.length > 0) {
+                        prefectureFeatures.push(...prefFeatures);
+                        selectedPrefectures.push(prefName);
+                    }
+                });
+            }
+
+            // 市町村レベルの処理（政令指定都市対応）
+            if (item['市町村レベル']) {
+                const cities = item['市町村レベル'].split(/[,、]/).map(c => c.trim());
+                
+                cities.forEach(city => {
+                    let found = false;
+                    
+                    // まず政令指定都市データから検索
+                    if (geoData.designatedCities) {
+                        const designatedFeatures = geoData.designatedCities.features.filter(f => {
+                            const props = f.properties;
+                            return props.N03_003 === city;
+                        });
+                        
+                        if (designatedFeatures.length > 0) {
+                            cityFeatures.push(...designatedFeatures);
+                            found = true;
+                        }
+                    }
+                    
+                    // 政令指定都市として見つからない場合は通常データから検索
+                    if (!found && geoData.cities) {
+                        const cityFoundFeatures = geoData.cities.features.filter(f => {
+                            const props = f.properties;
+                            const fullName = (props.N03_003 || '') + (props.N03_004 || '');
+                            
+                            // 完全一致を最優先
+                            if (props.N03_004 === city || fullName === city) {
+                                return true;
+                            }
+                            
+                            // 「苫小牧市」のような場合の完全一致
+                            if (!props.N03_003 && props.N03_004 === city) {
+                                return true;
+                            }
+                            
+                            return false;
+                        });
+                        
+                        if (cityFoundFeatures.length > 0) {
+                            cityFeatures.push(...cityFoundFeatures);
+                        }
+                    }
+                });
+            }
+
+            // 境界を計算
+            [...prefectureFeatures, ...cityFeatures].forEach(feature => {
+                if (feature.geometry.type === 'Polygon') {
+                    feature.geometry.coordinates[0].forEach(coord => {
+                        bounds.extend(coord);
+                    });
+                } else if (feature.geometry.type === 'MultiPolygon') {
+                    feature.geometry.coordinates.forEach(polygon => {
+                        polygon[0].forEach(coord => {
+                            bounds.extend(coord);
+                        });
+                    });
+                }
+            });
+
+            // 都道府県レベルのハイライト（青色の塗りつぶし）
+            if (prefectureFeatures.length > 0) {
+                const prefectureHighlightGeoJSON = {
+                    type: 'FeatureCollection',
+                    features: prefectureFeatures
+                };
+
+                map.addSource('prefecture-highlight', {
+                    type: 'geojson',
+                    data: prefectureHighlightGeoJSON
+                });
+
+                map.addLayer({
+                    id: 'prefecture-highlight-fill',
+                    type: 'fill',
+                    source: 'prefecture-highlight',
+                    paint: {
+                        'fill-color': '#4169e1',
+                        'fill-opacity': 0.3
+                    }
+                });
+
+                // 都道府県内の市町村境界を薄く表示
+                map.addLayer({
+                    id: 'prefecture-highlight-line',
+                    type: 'line',
+                    source: 'prefecture-highlight',
+                    paint: {
+                        'line-color': '#7fffd4',
+                        'line-width': 1,
+                        'line-opacity': 0.5
+                    }
+                });
+            }
+
+            // 市町村レベルのハイライト（濃い色で上書き）
+            if (cityFeatures.length > 0) {
+                const cityHighlightGeoJSON = {
+                    type: 'FeatureCollection',
+                    features: cityFeatures
+                };
+
+                map.addSource('city-highlight', {
+                    type: 'geojson',
+                    data: cityHighlightGeoJSON
+                });
+
+                map.addLayer({
+                    id: 'city-highlight-fill',
+                    type: 'fill',
+                    source: 'city-highlight',
+                    paint: {
+                        'fill-color': '#00c853',
+                        'fill-opacity': 0.8
+                    }
+                });
+
+                map.addLayer({
+                    id: 'city-highlight-line',
+                    type: 'line',
+                    source: 'city-highlight',
+                    paint: {
+                        'line-color': '#00c853',
+                        'line-width': 3
+                    }
+                });
+            }
+
+            // 都道府県の外周を強調表示
+            if (selectedPrefectures.length > 0 && geoData.prefectures) {
+                const prefectureOutlines = {
+                    type: 'FeatureCollection',
+                    features: []
+                };
+
+                // 選択された都道府県の境界を抽出
+                selectedPrefectures.forEach(prefName => {
+                    const prefectureFeatures = geoData.prefectures.features.filter(feature => {
+                        return feature.properties.N03_001 === prefName;
+                    });
+
+                    if (prefectureFeatures.length > 0) {
+                        prefectureOutlines.features.push(...prefectureFeatures);
+                        console.log(`${prefName}の境界データを抽出しました:`, prefectureFeatures.length, '件');
+                    } else {
+                        console.warn(`${prefName}の境界データが見つかりませんでした`);
+                    }
+                });
+
+                if (prefectureOutlines.features.length > 0) {
+                    map.addSource('prefecture-outline', {
+                        type: 'geojson',
+                        data: prefectureOutlines
+                    });
+
+                    // 都道府県の外周線を細く青色で表示
+                    map.addLayer({
+                        id: 'prefecture-outline',
+                        type: 'line',
+                        source: 'prefecture-outline',
+                        layout: {
+                            'line-cap': 'round',
+                            'line-join': 'round'
+                        },
+                        paint: {
+                            'line-color': '#4169e1',
+                            'line-width': 3,
+                            'line-opacity': 1
+                        }
+                    });
+                }
+            }
+
+            // 地図をズーム
+            if (bounds._sw && bounds._ne) {
+                map.fitBounds(bounds, {
+                    padding: 50,
+                    duration: 1000
+                });
+            }
+        }
+
+        // 選択をクリアする関数
+        function clearSelection() {
+            document.querySelectorAll('.data-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            ['prefecture-highlight-fill', 'prefecture-highlight-line', 
+             'city-highlight-fill', 'city-highlight-line',
+             'prefecture-outline', 'prefecture-outline-fill'].forEach(layerId => {
+                if (map.getLayer(layerId)) {
+                    map.removeLayer(layerId);
+                }
+            });
+            
+            ['prefecture-highlight', 'city-highlight', 'prefecture-outline'].forEach(sourceId => {
+                if (map.getSource(sourceId)) {
+                    map.removeSource(sourceId);
+                }
+            });
+            
+            selectedItem = null;
+            
+            // 日本全体を表示
+            map.flyTo({
+                center: [137.0, 38.0],
+                zoom: 5,
+                duration: 1000
+            });
+        }
+
+        // 地理データを読み込む関数
+        async function loadGeoData() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+
+            try {
+                // s0010（簡素化1％）で統一
+                const baseUrl = 'https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010/';
+                
+                // 1. 都道府県境界データを最初に読み込む
+                try {
+                    const prefectureResponse = await fetch(baseUrl + 'prefectures.json');
+                    if (prefectureResponse.ok) {
+                        geoData.prefectures = await prefectureResponse.json();
+                        console.log('都道府県境界データを読み込みました:', geoData.prefectures.features.length, '件');
+                        
+                        // 都道府県境界を背景として即座に追加
+                        map.addSource('prefectures-bg', {
+                            type: 'geojson',
+                            data: geoData.prefectures
+                        });
+
+                        // 都道府県の塗りつぶし（背景）
+                        map.addLayer({
+                            id: 'prefectures-bg-fill',
+                            type: 'fill',
+                            source: 'prefectures-bg',
+                            paint: {
+                                'fill-color': '#f8f8ff',
+                                'fill-opacity': 1
+                            }
+                        });
+
+                        // 都道府県の境界線（背景）
+                        map.addLayer({
+                            id: 'prefectures-bg-line',
+                            type: 'line',
+                            source: 'prefectures-bg',
+                            paint: {
+                                'line-color': '#c0c0c0',
+                                'line-width': 1,
+                                'line-opacity': 1
+                            }
+                        });
+                    } else {
+                        console.error('都道府県境界データの読み込み失敗:', prefectureResponse.status);
+                    }
+                } catch (e) {
+                    console.warn('都道府県境界データの読み込みエラー:', e);
+                }
+                
+                // 2. 市区町村データ
+                const cityResponse = await fetch(baseUrl + 'N03-21_210101.json');
+                const cityData = await cityResponse.json();
+                geoData.cities = cityData;
+
+                // 3. 政令指定都市データ（任意）
+                try {
+                    const designatedCityResponse = await fetch(baseUrl + 'N03-21_210101_designated_city.json');
+                    if (designatedCityResponse.ok) {
+                        const designatedCityData = await designatedCityResponse.json();
+                        geoData.designatedCities = designatedCityData;
+                        console.log('政令指定都市データを読み込みました（s0010版）');
+                    }
+                } catch (e) {
+                    console.warn('政令指定都市データの読み込みエラー:', e);
+                    geoData.designatedCities = null;
+                }
+
+                // 4. 市区町村レイヤーを追加
+                if (geoData.cities) {
+                    map.addSource('cities', {
+                        type: 'geojson',
+                        data: geoData.cities
+                    });
+
+                    // 市区町村の塗りつぶし（透明）
+                    map.addLayer({
+                        id: 'city-fill',
+                        type: 'fill',
+                        source: 'cities',
+                        paint: {
+                            'fill-color': '#000000',
+                            'fill-opacity': 0
+                        }
+                    });
+
+                    // 市区町村の境界線（完全に透明）
+                    map.addLayer({
+                        id: 'city-line',
+                        type: 'line',
+                        source: 'cities',
+                        paint: {
+                            'line-color': '#888',
+                            'line-width': 0.5,
+                            'line-opacity': 0
+                        }
+                    });
+                }
+
+                // 5. 政令指定都市データの追加（ソースのみ、表示はしない）
+                if (geoData.designatedCities) {
+                    map.addSource('designated-cities', {
+                        type: 'geojson',
+                        data: geoData.designatedCities
+                    });
+                }
+
+                console.log('地理データ読み込み完了:', {
+                    cities: geoData.cities.features.length,
+                    designatedCities: geoData.designatedCities ? geoData.designatedCities.features.length : 0,
+                    prefectures: geoData.prefectures ? geoData.prefectures.features.length : 0
+                });
+
+            } catch (error) {
+                console.error('地理データの読み込みエラー:', error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // CSVファイルを自動読み込みする関数
+        async function autoLoadCSV() {
+            console.log('CSVファイルの自動読み込みを開始...');
+            
+            try {
+                // fetchを使用してCSVファイルを読み込む
+                const response = await fetch('25-Akatsuki.csv');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const fileContent = await response.text();
+                console.log('CSVファイル読み込み成功');
+                
+                // CSVデータをパース
+                const blob = new Blob([fileContent], { type: 'text/csv' });
+                const file = new File([blob], '25-Akatsuki.csv', { type: 'text/csv' });
+                csvData = await loadCSV(file);
+                
+                console.log(`CSVデータ読み込み完了: ${csvData.length}件`);
+                displayDataList(csvData);
+                
+            } catch (error) {
+                console.error('CSVファイルの自動読み込みエラー:', error);
+                
+                // window.fsを試してみる（フォールバック）
+                if (window.fs && window.fs.readFile) {
+                    try {
+                        console.log('window.fsでの読み込みを試行...');
+                        const fileContent = await window.fs.readFile('25-Akatsuki.csv', { encoding: 'utf8' });
+                        const blob = new Blob([fileContent], { type: 'text/csv' });
+                        const file = new File([blob], '25-Akatsuki.csv', { type: 'text/csv' });
+                        csvData = await loadCSV(file);
+                        displayDataList(csvData);
+                    } catch (fsError) {
+                        console.error('window.fsでの読み込みも失敗:', fsError);
+                    }
+                }
+            }
+        }
+
+        // アトリビューションモーダルの表示切り替え
+        function toggleAttribution() {
+            const modal = document.getElementById('attribution-modal');
+            modal.classList.toggle('show');
+        }
+
+        // モーダル外クリックで閉じる
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('attribution-modal');
+            const button = document.querySelector('.attribution-button');
+            if (!modal.contains(e.target) && e.target !== button) {
+                modal.classList.remove('show');
+            }
+        });
+
+        // 地図の読み込み完了後の処理
+        map.on('load', async function() {
+            // 地理データを自動読み込み
+            await loadGeoData();
+            
+            // CSVファイルを自動読み込み
+            await autoLoadCSV();
+            
+            // ポップアップの設定
+            const popup = new maplibregl.Popup({
+                closeButton: false,
+                closeOnClick: false
+            });
+
+            // ホバー時の処理（市区町村）
+            if (map.getLayer('city-fill')) {
+                map.on('mousemove', 'city-fill', (e) => {
+                    map.getCanvas().style.cursor = 'pointer';
+                    const properties = e.features[0].properties;
+                    const coordinates = e.lngLat;
+                    
+                    const prefName = properties.N03_001 || '';
+                    const gunName = properties.N03_003 || '';
+                    const cityName = properties.N03_004 || '';
+                    const fullName = gunName + cityName;
+                    
+                    const html = `
+                        <strong>${fullName}</strong><br>
+                        <small>${prefName}</small>
+                    `;
+                    
+                    popup.setLngLat(coordinates)
+                        .setHTML(html)
+                        .addTo(map);
+                });
+
+                map.on('mouseleave', 'city-fill', () => {
+                    map.getCanvas().style.cursor = '';
+                    popup.remove();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
