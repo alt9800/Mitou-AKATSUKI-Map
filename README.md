@@ -1,4 +1,4 @@
-# Mitou-AKATSUKI-Map
+# Mitou-AKATSUKI-Map 令和6年度未踏AKATUSKI事業者マップ
 
 未踏AKATSUKI事業に関するいろんなデータをまとめるためのリポジトリです(現在のところ個人運用)
 

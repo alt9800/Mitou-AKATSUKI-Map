@@ -23,6 +23,46 @@
             box-sizing: border-box;
         }
         
+        /* モバイル対応 */
+        @media (max-width: 768px) {
+            #container {
+                flex-direction: column;
+                padding: 10px;
+                gap: 10px;
+            }
+            
+            #sidebar {
+                width: 100% !important;
+                height: 40vh;
+                order: 2;
+            }
+            
+            #map-container {
+                height: 60vh;
+                order: 1;
+            }
+            
+            .legend {
+                top: 10px !important;
+                right: 10px !important;
+                font-size: 12px;
+            }
+            
+            .attribution-button {
+                bottom: 40px !important;
+                right: 10px !important;
+                font-size: 11px !important;
+                padding: 4px 8px !important;
+            }
+        }
+        
+        /* タブレット対応 */
+        @media (max-width: 1024px) {
+            #sidebar {
+                width: 350px;
+            }
+        }
+        
         #map-container {
             flex: 1;
             position: relative;
@@ -30,6 +70,7 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             overflow: hidden;
+            min-height: 400px;
         }
         
         #map {
@@ -143,10 +184,47 @@
             top: 20px;
             right: 20px;
             background: white;
-            padding: 15px;
+            padding: 8px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             z-index: 1;
+            transition: all 0.3s ease;
+        }
+        
+        .legend.collapsed {
+            padding: 8px 12px;
+        }
+        
+        .legend.collapsed .legend-content {
+            display: none;
+        }
+        
+        .legend-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .legend-header h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+        
+        .legend-toggle {
+            margin-left: 10px;
+            font-size: 12px;
+            color: #666;
+            transition: transform 0.3s;
+        }
+        
+        .legend.collapsed .legend-toggle {
+            transform: rotate(180deg);
+        }
+        
+        .legend-content {
+            margin-top: 10px;
         }
         
         .legend-item {
@@ -350,15 +428,20 @@
         <div id="map-container">
             <div id="map"></div>
             <button id="clear-button" class="btn" onclick="clearSelection()">選択をクリア</button>
-            <div class="legend">
-                <h3 style="margin: 0 0 10px 0; font-size: 16px;">凡例</h3>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: rgba(65, 105, 225, 0.3); border: 2px solid #4169e1;"></div>
-                    <span>対象地域(都道府県)</span>
+            <div class="legend" id="legend">
+                <div class="legend-header" onclick="toggleLegend()">
+                    <h3>凡例</h3>
+                    <span class="legend-toggle">▼</span>
                 </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: rgba(0, 200, 83, 0.8);"></div>
-                    <span>対象地域(市町村)</span>
+                <div class="legend-content">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: rgba(65, 105, 225, 0.3); border: 2px solid #4169e1;"></div>
+                        <span>対象地域(都道府県)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: rgba(0, 200, 83, 0.8);"></div>
+                        <span>対象地域(市町村)</span>
+                    </div>
                 </div>
             </div>
             <button class="attribution-button" onclick="toggleAttribution()" title="データソース情報">
@@ -921,6 +1004,12 @@
                     }
                 }
             }
+        }
+
+        // 凡例の表示切り替え
+        function toggleLegend() {
+            const legend = document.getElementById('legend');
+            legend.classList.toggle('collapsed');
         }
 
         // アトリビューションモーダルの表示切り替え
